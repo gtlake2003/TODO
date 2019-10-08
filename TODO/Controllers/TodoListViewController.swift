@@ -7,13 +7,53 @@
 //
 
 import UIKit
+import CoreData
+
+extension TodoListViewController: UISearchBarDelegate {
+   
+    func searchBarSearchButtonClicked(_ searchBar: UISearchBar) {
+        let request: NSFetchRequest<ItemCocoa> = ItemCocoa.fetchRequest()
+        
+        request.predicate = NSPredicate(format: "title CONTAINS[c] %@", searchBar.text!)
+//        request.predicate = perdicate
+        request.sortDescriptors = [NSSortDescriptor(key: "title", ascending: true)]
+//        request.sortDescriptors = [sortDescriptor]
+        
+//        do {
+//            itemArray = try context.fetch(request)
+//        } catch {
+//            print("从context获取数据错误：\(error)")
+//        }
+//
+//        tableView.reloadData()
+//        print(searchBar.text!)
+        loadItems(with: request)
+    }
+    
+    func searchBar(_ searchBar: UISearchBar, textDidChange searchText: String) {
+        if searchBar.text?.count == 0 {
+            loadItems()
+            
+            DispatchQueue.main.async {
+                searchBar.resignFirstResponder()
+            }
+        }
+    }
+}
 
 class TodoListViewController: UITableViewController {
     
     let defaults = UserDefaults.standard
     let dataFilePath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first?.appendingPathComponent("Items.plist")
+    let context = (UIApplication.shared.delegate as! AppDelegate).persistentContainer.viewContext
 
-    var itemArray = [Item]()
+    var itemArray = [ItemCocoa]()
+    
+    var selectedCategory: Category? {
+        didSet {
+            loadItems()
+        }
+    }
     
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -40,8 +80,10 @@ class TodoListViewController: UITableViewController {
 //            itemArray.append(newItem)
 //        }
         
-        print(dataFilePath!)
-        loadItems()
+//        print(dataFilePath!)
+        print(FileManager.default.urls(for: .documentDirectory, in: .userDomainMask))
+//        let request: NSFetchRequest = ItemCocoa.fetchRequest()
+//        loadItems()
     }
 
     override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
@@ -78,7 +120,11 @@ class TodoListViewController: UITableViewController {
 //        }
         
         itemArray[indexPath.row].done = !itemArray[indexPath.row].done
-        saveItems()
+//        saveItems()
+        
+//        let title = itemArray[indexPath.row].title
+//        itemArray[indexPath.row].setValue(title! + "-（已完成）", forKey: "title")
+//        saveItems()
         
         tableView.beginUpdates()
         tableView.reloadRows(at: [indexPath], with: UITableView.RowAnimation.none)
@@ -95,9 +141,9 @@ class TodoListViewController: UITableViewController {
         
         let action = UIAlertAction(title: "添加项目", style: .default) {
             (action) in
-            let newItem = Item()
-            newItem.title = textField.text!
-            self.itemArray.append(newItem)
+//            let newItem = Item()
+//            newItem.title = textField.text!
+//            self.itemArray.append(newItem)
 //            self.defaults.set(self.itemArray, forKey: "ToDoListArray")
             
 //            do {
@@ -108,8 +154,14 @@ class TodoListViewController: UITableViewController {
 //                print("编码错误:\(error)")
 //            }
 //
+  
+            let newItem = ItemCocoa(context: self.context)
+            newItem.title = textField.text!
+            newItem.done = false
+            newItem.parentCategory = self.selectedCategory
+            self.itemArray.append(newItem)
             self.saveItems()
-            self.tableView.reloadData()
+//            self.tableView.reloadData()
         }
         
         alert.addTextField{(alertTextField) in
@@ -123,25 +175,49 @@ class TodoListViewController: UITableViewController {
     }
     
     func saveItems() {
-        let encoder = PropertyListEncoder()
-        
+//        let encoder = PropertyListEncoder()
+//
+//        do {
+//            let data = try encoder.encode(itemArray)
+//            try data.write(to: dataFilePath!)
+//        } catch {
+//             print("编码错误:\(error)")
+//        }
         do {
-            let data = try encoder.encode(itemArray)
-            try data.write(to: dataFilePath!)
+            
+            try context.save()
         } catch {
-             print("编码错误:\(error)")
+            print("保存context错误：\(error)")
         }
+        
+        tableView.reloadData()
     }
     
-    func loadItems() {
-        if let data = try? Data(contentsOf: dataFilePath!) {
-            let decoder = PropertyListDecoder()
-            do {
-                itemArray = try decoder.decode([Item].self, from: data)
-            } catch {
-               print("解码错误:\(error)")
+    func loadItems(with request: NSFetchRequest<ItemCocoa> = ItemCocoa.fetchRequest(), predicate: NSPredicate? = nil) {
+//        if let data = try? Data(contentsOf: dataFilePath!) {
+//            let decoder = PropertyListDecoder()
+//            do {
+//                itemArray = try decoder.decode([Item].self, from: data)
+//            } catch {
+//               print("解码错误:\(error)")
+//            }
+//        }
+//        let request: NSFetchRequest<ItemCocoa> = ItemCocoa.fetchRequest()
+        
+        do {
+            let categoryPredicate = NSPredicate(format: "parentCategory.name MATCHES %@", selectedCategory!.name!)
+            
+            if let addtionalPredicate = predicate {
+                request.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: [categoryPredicate, addtionalPredicate])
+            } else {
+                request.predicate = categoryPredicate
             }
+            
+            itemArray = try context.fetch(request)
+        } catch {
+            print("从context获取数据错误：\(error)")
         }
+        tableView.reloadData()
     }
 }
 
