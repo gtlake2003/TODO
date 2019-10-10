@@ -8,12 +8,15 @@
 
 import UIKit
 import CoreData
+import RealmSwift
 
 class CategoryViewController: UITableViewController {
     
-    var categories = [Category]()
+    let realm = try! Realm()
+//    var categories = [Category]()
+    var categories: Results<CategoryRealm>?
     
-    let context = (UIApplication.shared.delegate as! AppDelegate).persistentContainer.viewContext
+//    let context = (UIApplication.shared.delegate as! AppDelegate).persistentContainer.viewContext
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -35,14 +38,14 @@ class CategoryViewController: UITableViewController {
 
     override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
         // #warning Incomplete implementation, return the number of rows
-        return categories.count
+        return categories?.count ?? 1
     }
 
     
     override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell = tableView.dequeueReusableCell(withIdentifier: "CategoryCell", for: indexPath)
 
-        cell.textLabel?.text = categories[indexPath.row].name
+        cell.textLabel?.text = categories?[indexPath.row].name ?? "没有任何类别"
 
         return cell
     }
@@ -97,7 +100,7 @@ class CategoryViewController: UITableViewController {
         let destinationVC = segue.destination as! TodoListViewController
         if segue.identifier == "goToItems" {
             if let indexPath = tableView.indexPathForSelectedRow {
-                destinationVC.selectedCategory = categories[indexPath.row]
+                destinationVC.selectedCategory = categories?[indexPath.row]
             }
         }
     }
@@ -106,10 +109,11 @@ class CategoryViewController: UITableViewController {
         var textField = UITextField()
         let alert = UIAlertController(title: "添加新的类别", message: "", preferredStyle: .alert)
         let action = UIAlertAction(title: "添加", style: .default) {(action) in
-            let newCategory = Category(context: self.context)
+//            let newCategory = Category(context: self.context)
+            let newCategory = CategoryRealm()
             newCategory.name = textField.text!
-            self.categories.append(newCategory)
-            self.saveCategories()
+//            self.categories.append(newCategory)
+            self.saveCategories(category: newCategory)
         }
         
         alert.addAction(action)
@@ -121,9 +125,12 @@ class CategoryViewController: UITableViewController {
         present(alert, animated: true, completion: nil)
     }
     
-    func saveCategories() {
+    func saveCategories(category: CategoryRealm) {
         do {
-            try context.save()
+//            try context.save()
+            try realm.write {
+                realm.add(category)
+            }
         } catch {
             print("保存category错误：\(error)")
         }
@@ -131,10 +138,11 @@ class CategoryViewController: UITableViewController {
     }
     
     func loadCategories() {
-        let request: NSFetchRequest<Category> = Category.fetchRequest()
+//        let request: NSFetchRequest<Category> = Category.fetchRequest()
+        categories = realm.objects(CategoryRealm.self)
         
         do {
-            categories = try context.fetch(request)
+//            categories = try context.fetch(request)
         } catch {
             print("载入category错误：\(error)")
         }
